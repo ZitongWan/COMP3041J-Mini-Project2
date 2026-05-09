@@ -28,7 +28,7 @@ from ray_analysis import run_analysis_pipeline
 
 
 # Config
-
+# Find first CSV dataset file in directory
 def find_dataset_file(data_dir):
     pattern = os.path.join(data_dir, "*MiniProject*Dataset*.csv")
     matches = glob.glob(pattern)
@@ -56,7 +56,7 @@ class Config:
     # Detected at module load
     EXECUTION_ENVIRONMENT = None
 
-
+# Detect execution environment (OS, Python, Ray)
 def _detect_environment():
     import platform
     ps = platform.system()
@@ -78,19 +78,19 @@ Config.DEFAULT_DATA_FILE = find_dataset_file(Config.DATA_DIR)
 
 
 # Helpers
-
+# Print section header with equals signs
 def print_header(title):
     print("\n" + "=" * 60)
     print(f"  {title}")
     print("=" * 60)
 
-
+# Print subsection header with dashes
 def print_subheader(title):
     print(f"\n--- {title} ---")
 
 
 # Pipeline
-
+# Run full analytics pipeline: load, MapReduce, Ray, comparison
 def run_full_pipeline(data_file, output_dir=None):
     start_time = time.time()
 
@@ -232,7 +232,7 @@ def run_full_pipeline(data_file, output_dir=None):
 
 
 # CLI
-
+# Command line entry point: local file, OSS download, result upload
 def main():
     parser = argparse.ArgumentParser(
         description="Mini-Project 2: Cloud Service Log Analytics"

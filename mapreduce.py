@@ -31,14 +31,14 @@ def map_slow_endpoint(data):
         if row["response_time_ms"] > 800:
             yield ((row["service_name"], row["endpoint"]), 1)
 
-
+# Reduce key-value pairs by summing counts
 def reduce_counts(mapped_data):
     result = defaultdict(int)
     for key, value in mapped_data:
         result[key] += value
     return dict(result)
 
-
+# Aggregate per-service statistics: total, slow, error, timeout, bad_gateway, service_unavailable, database_error
 def aggregate_service_stats(data):
     """
     Per-service statistics fed into Ray for degraded detection.
@@ -71,7 +71,7 @@ def aggregate_service_stats(data):
 
     return dict(stats)
 
-
+# Run all MapReduce jobs and return aggregated results
 def run_mapreduce_pipeline(data):
     request_counts = reduce_counts(map_request_count(data))
     error_counts   = reduce_counts(map_error_count(data))

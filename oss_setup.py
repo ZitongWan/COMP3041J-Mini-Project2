@@ -27,7 +27,7 @@ RESULTS_DIR   = PROJECT_DIR / "results"
 OSS_DATASET_KEY = "Comp3041J MiniProject 2 Dataset.csv"
 OSS_RESULTS_KEY = "miniproject2/results/analysis_results.json"
 
-
+# Load environment variables from .env file if present
 def load_env_file():
     env_file = PROJECT_DIR / ".env"
     if env_file.exists():
@@ -38,7 +38,7 @@ def load_env_file():
                     key, _, value = line.partition("=")
                     os.environ.setdefault(key.strip(), value.strip())
 
-
+# Build OSS configuration dictionary from environment variables
 def get_config():
     load_env_file()
     return {
@@ -48,7 +48,7 @@ def get_config():
         "bucket_name":       os.getenv("OSS_BUCKET_NAME",     "comp3041j-miniproject2"),
     }
 
-
+# Validate that credentials are provided
 def check_credentials(config):
     if not config["access_key_id"] or not config["access_key_secret"]:
         print("✗  OSS credentials not set.")
@@ -57,17 +57,17 @@ def check_credentials(config):
         return False
     return True
 
-
+# Create an OSS Bucket client object
 def get_bucket(config):
     auth   = oss2.Auth(config["access_key_id"], config["access_key_secret"])
     return oss2.Bucket(auth, config["endpoint"], config["bucket_name"])
 
-
+# Find the first CSV dataset file in data/ directory
 def find_local_dataset():
     hits = list(DATA_DIR.glob("*.csv"))
     return hits[0] if hits else None
 
-
+# Create bucket if it does not already exist
 def create_bucket_if_not_exists(bucket, config):
     try:
         bucket.get_bucket_info()
@@ -85,7 +85,7 @@ def create_bucket_if_not_exists(bucket, config):
         print(f"✗  Bucket check failed: {e}")
         return False
 
-
+# Upload the dataset CSV file to OSS using resumable upload
 def upload_dataset(bucket, config, local_file):
     print(f"\n  Uploading: {local_file.name}")
     print(f"       → oss://{config['bucket_name']}/{OSS_DATASET_KEY}")
@@ -108,7 +108,7 @@ def upload_dataset(bucket, config, local_file):
         print(f"✗  Upload failed: {e}")
         return False
 
-
+# Verify that the dataset object exists in OSS and show metadata
 def verify_upload(bucket, config):
     try:
         meta = bucket.get_object_meta(OSS_DATASET_KEY)
@@ -125,7 +125,7 @@ def verify_upload(bucket, config):
         print(f"✗  Object not found: {e}")
         return False
 
-
+# List all objects in the OSS bucket
 def list_bucket(bucket, config):
     print(f"\n  Objects in oss://{config['bucket_name']}/")
     print("  " + "-" * 50)
@@ -137,7 +137,7 @@ def list_bucket(bucket, config):
     if not found:
         print("  (empty bucket)")
 
-
+# Download the dataset from OSS to local data/ directory
 def download_dataset(bucket, config):
     local_path = DATA_DIR / "cloud_service_logs_from_oss.csv"
     DATA_DIR.mkdir(exist_ok=True)
@@ -149,7 +149,7 @@ def download_dataset(bucket, config):
         print(f"✗  Download failed: {e}")
         return False
 
-
+# Upload the analysis results JSON file to OSS
 def upload_results(bucket, config):
     results_file = RESULTS_DIR / "analysis_results.json"
     if not results_file.exists():
@@ -163,7 +163,7 @@ def upload_results(bucket, config):
         print(f"✗  Results upload failed: {e}")
         return False
 
-
+# CLI entry point: parse arguments and execute requested OSS operations
 def main():
     parser = argparse.ArgumentParser(
         description="Alibaba Cloud OSS helper for Mini-Project 2"

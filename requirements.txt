@@ -1,0 +1,13 @@
+# Mini-Project 2 Requirements
+# Install with: pip install -r requirements.txt
+#
+# NOTE: Ray requires Python 3.10 or 3.11.
+#       Use: conda activate ml   (Python 3.10)
+#       Then: pip install -r requirements.txt
+
+# Alibaba Cloud OSS SDK (Task 1: cloud object storage)
+oss2>=2.18.0
+
+# Ray for parallel distributed computing (Task 3: required)
+# Python 3.10 / 3.11 only — NOT compatible with Python 3.13
+ray>=2.40.0

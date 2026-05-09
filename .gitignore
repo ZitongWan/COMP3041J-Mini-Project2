@@ -1,0 +1,16 @@
+# credentials (real values - never commit)
+.env
+
+# OSS downloaded copy
+data/cloud_service_logs_from_oss.csv
+
+# runtime output
+results/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/

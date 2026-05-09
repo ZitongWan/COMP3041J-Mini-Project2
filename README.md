@@ -159,7 +159,7 @@ oss2        # Alibaba Cloud OSS SDK (Task 1)
 ray         # Ray parallel processing (Task 3; Python <= 3.12 required)
 ```
 
-> Ray does not support Python 3.13. On Python 3.13 the pipeline falls back to local execution automatically. Use the `ml` conda environment (Python 3.12) for full Ray support.
+> Ray does not support Python 3.13. On Python 3.13 the pipeline falls back to local execution automatically. 
 
 ## Execution Environment
 
@@ -167,6 +167,6 @@ Detected automatically and recorded in `analysis_results.json`.
 
 | Environment | Ray backend | Notes |
 |---|---|---|
-| Windows (Python 3.12, ml env) | Ray (local) | raylet startup overhead (~35s) due to Windows resource constraints |
+| Windows (Python 3.12) | Ray (local) | raylet startup overhead (~35s) due to Windows resource constraints |
 | Windows (Python 3.13) | local fallback | Ray not available |
 | Linux (ECS / Ray cluster) | Ray (distributed) | Fast init (< 1s) |

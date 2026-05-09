@@ -87,7 +87,7 @@ def analyze_service(service_name, stats):
             "timeout_errors": timeout,
         }
     }
-
+# Dispatch one Ray task per service (fallback to local if Ray unavailable)
 def run_parallel_analysis(service_stats, use_ray=True):
     """
     Dispatch one Ray task per service and collect the results.
@@ -127,7 +127,7 @@ def run_parallel_analysis(service_stats, use_ray=True):
         -x["metrics"]["total_requests"]
     ))
     return backend, results
-
+# Analyze a single service locally (fallback when Ray unavailable)
 def _analyze_service_local(service_name, stats):
     # same logic as analyze_service, runs without Ray
     total   = stats["total"]
@@ -178,11 +178,11 @@ def _analyze_service_local(service_name, stats):
             "timeout_errors": timeout,
         }
     }
-
+# Filter out non‑degraded services
 def get_degraded_services(results):
     return [r for r in results if r["level"] != "healthy"]
 
-
+# Convert results to human‑readable lines
 def format_output(results):
     lines = []
     for r in results:
@@ -192,7 +192,7 @@ def format_output(results):
             lines.append(f"{r['service']}: {r['level']} - {r['reason']}")
     return "\n".join(lines)
 
-
+# Run the full analysis pipeline and return structured results with summary
 def run_analysis_pipeline(service_stats, use_ray=True):
     """
     Full analysis pipeline. Returns all results plus a summary.

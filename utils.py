@@ -6,7 +6,7 @@ import csv
 import json
 import tempfile
 import os
-
+# Load CSV log file and parse into list of dictionaries
 def load_data(file_path):
     records = []
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -28,7 +28,7 @@ def load_data(file_path):
                 "error_type":      row[9] if len(row) > 9 else ""
             })
     return records
-
+# Download CSV from OSS, load via temporary file
 def load_data_from_oss(bucket_name, object_key, oss_client):
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.csv')
     tmp_path = tmp.name
@@ -39,7 +39,7 @@ def load_data_from_oss(bucket_name, object_key, oss_client):
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
-
+# Recursively convert tuple keys to strings for JSON serialization
 def convert_to_serializable(obj):
     if isinstance(obj, dict):
         return {str(k) if isinstance(k, tuple) else k: convert_to_serializable(v) for k, v in obj.items()}
@@ -48,11 +48,11 @@ def convert_to_serializable(obj):
     elif isinstance(obj, tuple):
         return str(obj)
     return obj
-
+# Save results dictionary as JSON file
 def save_results(data, output_path):
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(convert_to_serializable(data), f, indent=2, ensure_ascii=False)
-
+# Pretty‑print results to console
 def print_results(results):
     for key, value in results.items():
         print(f"\n=== {key} ===")

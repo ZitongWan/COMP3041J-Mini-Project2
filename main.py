@@ -11,36 +11,37 @@ Data flow:
     JSON results + console output
 """
 
+import argparse
+import glob
 import os
 import sys
-import json
 import time
-import glob
-import argparse
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from utils import load_data, save_results, print_results
+from utils import load_data, save_results
 from mapreduce import run_mapreduce_pipeline
 from ray_analysis import run_analysis_pipeline
 
 
-# Config
-# Find first CSV dataset file in directory
 def find_dataset_file(data_dir):
+    """Find first CSV dataset file in directory."""
     pattern = os.path.join(data_dir, "*MiniProject*Dataset*.csv")
     matches = glob.glob(pattern)
     if matches:
         return matches[0]
+
     csv_files = glob.glob(os.path.join(data_dir, "*.csv"))
     if csv_files:
         return csv_files[0]
+
     return None
 
 
 class Config:
+    """Configuration constants for the pipeline."""
     DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
     RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
     DEFAULT_DATA_FILE = None
@@ -48,50 +49,58 @@ class Config:
     OSS_BUCKET = "comp3041j-miniproject2"
     OSS_OBJECT_KEY = "data/logs.csv"
 
-    # Ray thresholds for degraded service detection
     SLOW_RATE_THRESHOLD = 0.2
     ERROR_RATE_THRESHOLD = 0.1
     TIMEOUT_COUNT_THRESHOLD = 5
 
-    # Detected at module load
     EXECUTION_ENVIRONMENT = None
 
-# Detect execution environment (OS, Python, Ray)
+
 def _detect_environment():
+    """Detect execution environment (OS, Python, Ray)."""
     import platform
+
     ps = platform.system()
     py_ver = platform.python_version()
+
     try:
         import ray as _ray_check
         ray_ver = getattr(_ray_check, "__version__", "unknown")
         ray_str = f"Ray {ray_ver}"
     except Exception:
         ray_str = "Ray unavailable (Python 3.13 / Windows)"
+
     local_str = f"{ps} ({platform.version()})"
     return f"Local machine, {local_str}, Python {py_ver}, {ray_str}"
 
 
 Config.EXECUTION_ENVIRONMENT = _detect_environment()
-
-
 Config.DEFAULT_DATA_FILE = find_dataset_file(Config.DATA_DIR)
 
 
-# Helpers
-# Print section header with equals signs
 def print_header(title):
+    """Print section header with equals signs."""
     print("\n" + "=" * 60)
     print(f"  {title}")
     print("=" * 60)
 
-# Print subsection header with dashes
+
 def print_subheader(title):
+    """Print subsection header with dashes."""
     print(f"\n--- {title} ---")
 
 
-# Pipeline
-# Run full analytics pipeline: load, MapReduce, Ray, comparison
 def run_full_pipeline(data_file, output_dir=None):
+    """
+    Run full analytics pipeline: load, MapReduce, Ray, comparison.
+
+    Args:
+        data_file: Path to CSV data file
+        output_dir: Directory to save results (optional)
+
+    Returns:
+        dict: Complete analysis results
+    """
     start_time = time.time()
 
     results = {
@@ -106,7 +115,6 @@ def run_full_pipeline(data_file, output_dir=None):
         "comparison": {}
     }
 
-    # Load data
     print_header("Step 1: Loading Data")
     if not os.path.exists(data_file):
         print(f"✗ Data file not found: {data_file}")
@@ -116,24 +124,21 @@ def run_full_pipeline(data_file, output_dir=None):
     print(f"✓ Loaded {len(data)} log records")
     results["metadata"]["record_count"] = len(data)
 
-    # MapReduce
     print_header("Step 2: MapReduce Analysis")
     mr_start = time.time()
     mr_results = run_mapreduce_pipeline(data)
     mr_time = time.time() - mr_start
     print(f"MapReduce completed in {mr_time:.3f} seconds")
 
-    # Output 1: request count by service
     print_subheader("Output 1: Request Count by Service")
     for service, count in sorted(mr_results["request_count"].items()):
         print(f"  {service}: {count}")
 
-    # Output 2: server error count by service
     print_subheader("Output 2: Server Error Count (status >= 500)")
-    for service, count in sorted(mr_results["error_count"].items(), key=lambda x: -x[1]):
+    error_items = sorted(mr_results["error_count"].items(), key=lambda x: -x[1])
+    for service, count in error_items:
         print(f"  {service}: {count}")
 
-    # Output 3: top 10 slow endpoints
     print_subheader("Output 3: Top 10 Slow Endpoints (response_time > 800ms)")
     for (service, endpoint), count in mr_results["top_slow_endpoints"]:
         print(f"  {service}{endpoint}: {count}")
@@ -146,16 +151,16 @@ def run_full_pipeline(data_file, output_dir=None):
         "execution_time_seconds": mr_time
     }
 
-    # Ray
     ray_results = run_analysis_pipeline(mr_results["service_stats"])
     ray_time = ray_results["execution_time"]
     ray_backend = ray_results["execution_backend"]
 
-    # user-facing labels always say "Ray" per project spec
-    # ray_backend is saved in JSON for documentation purposes
     print_header("Step 3: Ray Parallel Analysis")
     ray_ms = ray_time * 1000
-    ray_time_str = f"{ray_ms:.1f}ms" if ray_ms >= 1 else "<1ms"
+    if ray_ms >= 1:
+        ray_time_str = f"{ray_ms:.1f}ms"
+    else:
+        ray_time_str = "<1ms"
     print(f"Ray analysis completed in {ray_time_str}")
 
     summary = ray_results["summary"]
@@ -168,12 +173,14 @@ def run_full_pipeline(data_file, output_dir=None):
 
     print_subheader("Degraded Services (Ray Detection)")
     for service_result in ray_results["all_services"]:
-        status = "✓" if service_result["level"] == "healthy" else "⚠"
-        if service_result["level"] != "healthy":
-            print(f"  {status} {service_result['service']}: {service_result['level']}")
-            print(f"      Reason: {service_result['reason']}")
+        if service_result["level"] == "healthy":
+            status = "✓"
         else:
-            print(f"  {status} {service_result['service']}: {service_result['level']}")
+            status = "⚠"
+
+        print(f"  {status} {service_result['service']}: {service_result['level']}")
+        if service_result["level"] != "healthy":
+            print(f"      Reason: {service_result['reason']}")
 
     results["ray"] = {
         "all_services": ray_results["all_services"],
@@ -183,7 +190,6 @@ def run_full_pipeline(data_file, output_dir=None):
         "execution_backend": ray_backend
     }
 
-    # Comparison
     print_header("Step 4: MapReduce vs Ray Comparison")
     comparison = {
         "mapreduce": {
@@ -220,7 +226,8 @@ def run_full_pipeline(data_file, output_dir=None):
     print(f"Total execution time: {total_time:.3f} seconds")
     print(f"Records processed: {len(data)}")
     print(f"Services analyzed: {summary['total_services']}")
-    print(f"Degraded services detected: {summary['degraded_count'] + summary['critical_count']}")
+    degraded_count = summary['degraded_count'] + summary['critical_count']
+    print(f"Degraded services detected: {degraded_count}")
 
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
@@ -231,32 +238,35 @@ def run_full_pipeline(data_file, output_dir=None):
     return results
 
 
-# CLI
-# Command line entry point: local file, OSS download, result upload
 def main():
+    """Command line entry point: local file, OSS download, result upload."""
     parser = argparse.ArgumentParser(
         description="Mini-Project 2: Cloud Service Log Analytics"
     )
     parser.add_argument(
-        "data_file", nargs="?",
+        "data_file",
+        nargs="?",
         help="Path to CSV data file (default: auto-detected from data/)"
     )
     parser.add_argument(
-        "--from-oss", action="store_true",
+        "--from-oss",
+        action="store_true",
         help="Download data from Alibaba Cloud OSS instead of local file"
     )
     parser.add_argument(
-        "--upload-results", action="store_true",
+        "--upload-results",
+        action="store_true",
         help="Upload analysis results back to OSS after running"
     )
     args = parser.parse_args()
 
-    # Load from OSS
     if args.from_oss:
         print("\n  [OSS mode] Fetching dataset from Alibaba Cloud OSS ...")
         try:
-            from oss_setup import get_config, check_credentials, get_bucket
-            from oss_setup import OSS_DATASET_KEY, DATA_DIR
+            from oss_setup import (
+                get_config, check_credentials, get_bucket,
+                OSS_DATASET_KEY, DATA_DIR
+            )
             import oss2
 
             config = get_config()
@@ -276,8 +286,6 @@ def main():
         except Exception as e:
             print(f"✗  OSS download failed: {e}")
             sys.exit(1)
-
-    # Load from local file
     else:
         data_file = args.data_file or Config.DEFAULT_DATA_FILE
         if not data_file or not os.path.exists(data_file):
@@ -295,13 +303,13 @@ def main():
                 print("  python main.py --from-oss             # from OSS")
                 sys.exit(1)
 
-    # Run
     results = run_full_pipeline(data_file, Config.RESULTS_DIR)
 
-    # Upload results to OSS if requested
     if args.upload_results:
         try:
-            from oss_setup import get_config, check_credentials, get_bucket, upload_results
+            from oss_setup import (
+                get_config, check_credentials, get_bucket, upload_results
+            )
             config = get_config()
             if check_credentials(config):
                 bucket = get_bucket(config)
@@ -309,7 +317,6 @@ def main():
         except Exception as e:
             print(f"  (results upload skipped: {e})")
 
-    # Required output format: service_name,reason_label
     print("\n" + "=" * 60)
     print("  Final Degraded Service Output (Required Format)")
     print("=" * 60)
